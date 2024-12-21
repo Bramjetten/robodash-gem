@@ -10,6 +10,7 @@ Gem::Specification.new do |spec|
 
   spec.summary = "A simple gem to send asynchronous POST requests to Robodash."
   spec.description = "Robodash is a lightweight Ruby gem for sending POST requests to Robodash's API. It is designed to be simple to use, with support for API tokens and background threading for non-blocking requests. Ideal for 'fire-and-forget' HTTP pings."
+  spec.license = "MIT"
   spec.homepage = "https://beta.robodash.app"
 
   spec.required_ruby_version = ">= 2.7.0"
@@ -17,7 +18,7 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/Bramjetten/robodash-gem"
 
-  spec.files = Dir["{lib}/**/*"] + ["README.md"]
+  spec.files = Dir["{lib}/**/*"] + ["README.md", "LICENSE.md"]
 
   spec.require_paths = ["lib"]
 end

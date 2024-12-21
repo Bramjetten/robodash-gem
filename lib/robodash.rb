@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "robodash/version"
+require "net/http"
+require "uri"
+require "json"
 
 module Robodash
   # Defaults

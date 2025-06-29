@@ -7,55 +7,82 @@ require "json"
 
 module Robodash
   # Defaults
-  DEFAULT_HOST = "https://beta.robodash.app"
-  OPEN_TIMEOUT = 5
-  READ_TIMEOUT = 10
+  DEFAULT_HOST = "https://robodash.app"
+  OPEN_TIMEOUT = 2
+  READ_TIMEOUT = 5
 
   class << self
-    attr_accessor :api_token, :host
+    attr_accessor :api_token, :host, :enabled
 
-    def ping(name)
-      post("ping", {name: name})
+    def enabled?
+      return true if @enabled.nil?
+      @enabled
+    end
+
+    # Possible schedules:
+    # - minutely
+    # - hourly
+    # - daily
+    # - weekly
+    # - monthly
+    # - yearly
+    def ping(name, schedule = :daily, grace_period = nil)
+      fire_and_forget("ping", {name: name})
     end
 
     # Count should always be an integer
-    def count(name, count)
-      post("count", {name: name, count: count.to_i})
+    def count(name, count, range = nil)
+      fire_and_forget("count", {name: name, count: count.to_i})
     end
 
     private
 
-      def post(endpoint, body)
-        raise "API token is not set!" unless api_token
+      def fire_and_forget(endpoint, body)
+        return false unless enabled?
+        return false unless api_token
 
-        begin
-          Thread.new do
-            # URI is always on the /api/ endpoint right now
-            uri = URI("#{host}/api/#{endpoint}.json")
-
-            # Build a new POST request with Net::HTTP
-            # Always a JSON-request
-            request = Net::HTTP::Post.new(uri)
-            request["Authorization"] = "dashboard-token #{api_token}"
-            request["Content-Type"] = "application/json"
-            request.body = body.to_json
-
-            send_request(uri, request)
+        # Create detached thread that won't block the main application
+        Thread.new do
+          Thread.current.abort_on_exception = false
+          
+          begin
+            send_api_request(endpoint, body)
+          rescue => e
+            # Log the error but don't re-raise it
+            warn_safely("Robodash request failed: #{e.class} - #{e.message}")
           end
-          true
-        rescue StandardError => e
-          # If something goes wrong, just show that message
-          warn "Failed to ping Robodash: #{e.message}"
-          false
+        end.tap(&:detach) # Detach thread so it can be garbage collected
+
+        true
+      end
+
+      def send_api_request(endpoint, body)
+        uri = URI("#{host}/api/#{endpoint}.json")
+        
+        request = Net::HTTP::Post.new(uri)
+        request["Authorization"] = "dashboard-token #{api_token}"
+        request["Content-Type"] = "application/json"
+        request.body = body.to_json
+
+        # Use aggressive timeouts for fire-and-forget
+        Net::HTTP.start(uri.hostname, uri.port, 
+                        use_ssl: uri.scheme == "https",
+                        open_timeout: OPEN_TIMEOUT,
+                        read_timeout: READ_TIMEOUT,
+                        ssl_timeout: OPEN_TIMEOUT) do |http|
+          http.request(request)
         end
       end
 
-      def send_request(uri, request)
-        Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
-          http.open_timeout = OPEN_TIMEOUT
-          http.read_timeout = READ_TIMEOUT
-          http.request(request)
+      # Only warn if we're in a context where it's safe to do so
+      def warn_safely(message)
+        if defined?(Rails) && Rails.logger
+          Rails.logger.warn("[Robodash] #{message}")
+        elsif $stderr && !$stderr.closed?
+          $stderr.puts("[Robodash] #{message}")
         end
+      rescue
+        # If even logging fails, just silently continue
       end
 
       def host

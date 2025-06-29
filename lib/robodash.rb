@@ -26,8 +26,13 @@ module Robodash
     # - weekly
     # - monthly
     # - yearly
-    def ping(name, schedule = :daily, grace_period = nil)
-      fire_and_forget("ping", {name: name})
+    def ping(name, schedule_number = 1, schedule_period = "day", grace_period: 1.minute)
+      fire_and_forget("ping", {
+        name: name, 
+        schedule_number: schedule_number,
+        schedule_period: schedule_period,
+        grace_period: grace_period.to_i
+      })
     end
 
     # Count should always be an integer
@@ -41,7 +46,6 @@ module Robodash
         return false unless enabled?
         return false unless api_token
 
-        # Create detached thread that won't block the main application
         Thread.new do
           Thread.current.abort_on_exception = false
           
@@ -50,7 +54,7 @@ module Robodash
           rescue => e
             warn_safely("Robodash request failed: #{e.class} - #{e.message}")
           end
-        end.tap(&:detach) # Detach thread so it can be garbage collected
+        end
 
         true
       end

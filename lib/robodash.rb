@@ -48,7 +48,6 @@ module Robodash
           begin
             send_api_request(endpoint, body)
           rescue => e
-            # Log the error but don't re-raise it
             warn_safely("Robodash request failed: #{e.class} - #{e.message}")
           end
         end.tap(&:detach) # Detach thread so it can be garbage collected

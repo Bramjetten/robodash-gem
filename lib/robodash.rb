@@ -11,6 +11,9 @@ module Robodash
   OPEN_TIMEOUT = 2
   READ_TIMEOUT = 5
 
+  # Parse flexible format like "every 30 minutes", "3 days", "2 hours"
+  SCHEDULE_REGEX = /^(?:every\s+)?(\d+)\s*(minute|hour|day|week|month|year)s?$/
+
   class << self
     attr_accessor :api_token, :host, :enabled
 
@@ -26,13 +29,16 @@ module Robodash
     # - weekly
     # - monthly
     # - yearly
-    def ping(name, schedule_number = 1, schedule_period = "day", grace_period: 1.minute)
-      fire_and_forget("ping", {
-        name: name, 
-        schedule_number: schedule_number,
-        schedule_period: schedule_period,
-        grace_period: grace_period.to_i
-      })
+    #
+    # Examples:
+    # Robodash.ping("Some task", :daily, grace_period: 10.minutes)
+    # Robodash.ping("Some task", "every 10 minutes", grace_period: 10.minutes)
+    def ping(name, schedule = nil, grace_period: nil)
+      params = {name: name}
+      params.merge!({grace_period: grace_period.to_i}) if grace_period.present?
+      params.merge!(parse_schedule(schedule)) if schedule.present?
+
+      fire_and_forget("ping", params)
     end
 
     # Count should always be an integer
@@ -41,6 +47,27 @@ module Robodash
     end
 
     private
+      
+      def parse_schedule(schedule)
+        schedule = schedule.to_s.strip.downcase
+        return predefined_schedules[schedule] if predefined_schedules[schedule]
+
+        match = schedule.match(SCHEDULE_REGEX)
+        return {schedule_number: match[1].to_i, schedule_period: match[2]} if match
+        
+        {}
+      end
+
+      def predefined_schedules
+        {
+          "minutely" => {schedule_period: "minute", schedule_number: 1},
+          "hourly" => {schedule_period: "hour", schedule_number: 1},
+          "daily" => {schedule_period: "day", schedule_number: 1},
+          "weekly" => {schedule_period: "week", schedule_number: 1},
+          "monthly" => {schedule_period: "month", schedule_number: 1},
+          "yearly" => {schedule_period: "year", schedule_number: 1}
+        }
+      end
 
       def fire_and_forget(endpoint, body)
         return false unless enabled?

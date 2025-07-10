@@ -60,10 +60,6 @@ module Robodash
         @threads = value
       end
 
-      def mutex
-        @mutex ||= Mutex.new
-      end
-
       def parse_schedule(schedule)
         schedule = schedule.to_s.strip.downcase
         return predefined_schedules[schedule] if predefined_schedules[schedule]
@@ -89,18 +85,16 @@ module Robodash
         return false unless enabled?
         return false unless api_token
 
-        mutex.synchronize do
-          threads << Thread.new do
-            Thread.current.abort_on_exception = false
+        threads << Thread.new do
+          Thread.current.abort_on_exception = false
 
-            begin
-              send_api_request(endpoint, body)
-            rescue => e
-              warn_safely("Robodash request failed: #{e.class} - #{e.message}")
-            end
+          begin
+            send_api_request(endpoint, body)
+          rescue => e
+            warn_safely("Robodash request failed: #{e.class} - #{e.message}")
           end
-          threads = self.threads.select(&:alive?)
         end
+        threads = self.threads.select(&:alive?)
 
         true
       end

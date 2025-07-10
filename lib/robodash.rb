@@ -56,8 +56,9 @@ module Robodash
         @threads ||= []
       end
 
-      def threads=(value)
-        @threads = value
+      def track_thread(&block)
+        threads << Thread.new(&block)
+        threads.select!(&:alive?)
       end
 
       def parse_schedule(schedule)
@@ -85,7 +86,7 @@ module Robodash
         return false unless enabled?
         return false unless api_token
 
-        threads << Thread.new do
+        track_thread do
           Thread.current.abort_on_exception = false
 
           begin
@@ -94,7 +95,6 @@ module Robodash
             warn_safely("Robodash request failed: #{e.class} - #{e.message}")
           end
         end
-        threads = self.threads.select(&:alive?)
 
         true
       end

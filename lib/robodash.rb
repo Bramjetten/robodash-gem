@@ -46,8 +46,21 @@ module Robodash
       fire_and_forget("count", {name: name, count: count.to_i})
     end
 
+    def finish_up!
+      threads.each(&:join)
+    end
+
     private
-      
+
+      def threads
+        @threads ||= []
+      end
+
+      def track_thread(&block)
+        threads << Thread.new(&block)
+        threads.select!(&:alive?)
+      end
+
       def parse_schedule(schedule)
         schedule = schedule.to_s.strip.downcase
         return predefined_schedules[schedule] if predefined_schedules[schedule]
@@ -73,9 +86,9 @@ module Robodash
         return false unless enabled?
         return false unless api_token
 
-        Thread.new do
+        track_thread do
           Thread.current.abort_on_exception = false
-          
+
           begin
             send_api_request(endpoint, body)
           rescue => e
@@ -122,3 +135,6 @@ module Robodash
   end
 end
 
+at_exit do
+  Robodash.finish_up!
+end

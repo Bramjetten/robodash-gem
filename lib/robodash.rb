@@ -46,6 +46,12 @@ module Robodash
       fire_and_forget("count", {name: name, count: count.to_i})
     end
 
+    # Track values for a specific measurement over time
+    # Includes a client-side timestamp by default.
+    def measure(name, value, unit = nil, timestamp = Time.current)
+      fire_and_forget("measurements", { name:, value:, unit:, timestamp: }.compact)
+    end
+
     def finish_up!
       threads.each(&:join)
     end
@@ -67,7 +73,7 @@ module Robodash
 
         match = schedule.match(SCHEDULE_REGEX)
         return {schedule_number: match[1].to_i, schedule_period: match[2]} if match
-        
+
         {}
       end
 
@@ -101,14 +107,14 @@ module Robodash
 
       def send_api_request(endpoint, body)
         uri = URI("#{host}/api/#{endpoint}.json")
-        
+
         request = Net::HTTP::Post.new(uri)
         request["Authorization"] = "dashboard-token #{api_token}"
         request["Content-Type"] = "application/json"
         request.body = body.to_json
 
         # Use aggressive timeouts for fire-and-forget
-        Net::HTTP.start(uri.hostname, uri.port, 
+        Net::HTTP.start(uri.hostname, uri.port,
                         use_ssl: uri.scheme == "https",
                         open_timeout: OPEN_TIMEOUT,
                         read_timeout: READ_TIMEOUT,
